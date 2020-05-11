@@ -23,7 +23,7 @@ class AppointmentController {
             {
                model: User,
                as: 'provider',
-               attributes: ['name', 'id'],
+               attributes: ['id', 'name'],
                include: [
                   {
                      model: File,
@@ -45,7 +45,7 @@ class AppointmentController {
       });
 
       if (!(await schema.isValid(req.body))) {
-         return res.status(400).json({ error: 'Validation Fails.' });
+         return res.status(401).json({ error: 'Validation Fails.' });
       }
 
       const { provider_id, date } = req.body;
@@ -53,7 +53,6 @@ class AppointmentController {
       /**
        * Check if a provider_id is a provider
        */
-
       const isProvider = await User.findOne({
          where: { id: provider_id, provider: true },
       });
@@ -65,12 +64,21 @@ class AppointmentController {
       }
 
       /**
+       * User cannot create appointments with himself
+       */
+      if (req.userId == provider_id) {
+         return res
+            .status(401)
+            .json({ error: 'You cannot create appointments with youself' });
+      }
+
+      /**
        * Check for past dates;
        */
       const hourStart = startOfHour(parseISO(date));
 
       if (isBefore(hourStart, new Date())) {
-         return res.status(400).json({ error: 'Past dates are not permitted' });
+         return res.status(401).json({ error: 'Past dates are not permitted' });
       }
 
       /**
@@ -86,14 +94,14 @@ class AppointmentController {
 
       if (checkAvailability) {
          return res
-            .status(400)
+            .status(401)
             .json({ error: 'Appointment date is not available' });
       }
 
       const appointment = Appointment.create({
          user_id: req.userId,
          provider_id,
-         date: hourStart,
+         date,
       });
 
       /**
